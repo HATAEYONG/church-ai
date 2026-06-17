@@ -2,7 +2,7 @@
   "name": "a-men",
   "version": "0.1.1",
   "private": true,
-  "description": "에이맨(A-Men) — 다음 세대 신앙교육을 위한 AI 기반 교회 플랫폼",
+  "description": "다음 세대 신앙교육을 위한 AI 기반 교회 플랫폼",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

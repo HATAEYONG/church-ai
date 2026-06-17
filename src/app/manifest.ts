@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "에이맨 (A-Men) — AI 신앙교육 플랫폼",
-    short_name: "에이맨",
+    name: "AI 신앙교육 플랫폼",
+    short_name: "신앙교육",
     description:
       "기도노트·감사노트에서 출발한 AI 기반 신앙교육 플랫폼. 말씀 묵상, 게임형 학습, AI 신앙 멘토까지.",
     start_url: "/",

@@ -61,7 +61,7 @@ export default function HomePage() {
       {/* 히어로 */}
       <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-amen-600 to-amen-700 p-7 text-white shadow-lg sm:p-10">
         <p className="text-sm font-medium text-amen-100">
-          다음 세대 신앙교육을 위한 AI 기반 교회 플랫폼
+          다음 세대 신앙교육을 위한 AI 기반 플랫폼
         </p>
         <h1 className="mt-2 text-3xl font-bold leading-tight sm:text-4xl">
           기도는 기록되고, 감사는 발견되며,
@@ -69,7 +69,7 @@ export default function HomePage() {
           말씀은 삶으로 이어집니다.
         </h1>
         <p className="mt-3 max-w-xl text-amen-100">
-          에이맨은 매일의 기도·감사·묵상을 기록하고, AI 신앙 멘토와 대화하며,
+          매일의 기도·감사·묵상을 기록하고, AI 신앙 멘토와 대화하며,
           게임처럼 말씀을 배우는 디지털 신앙 동행 앱입니다.
         </p>
         <div className="mt-6 flex flex-wrap gap-2">

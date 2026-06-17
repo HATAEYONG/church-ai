@@ -1,4 +1,4 @@
-// 에이맨 공통 타입 정의
+// 신앙교육 플랫폼 공통 타입 정의
 
 export type Role = "student" | "teacher" | "admin" | "parent";
 

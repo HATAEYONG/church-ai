@@ -34,7 +34,7 @@ export default function NavBar() {
             ✝
           </span>
           <span className="hidden text-lg font-bold tracking-tight sm:inline">
-            에이맨
+            신앙교육
           </span>
         </Link>
 
