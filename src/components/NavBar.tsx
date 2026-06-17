@@ -33,9 +33,6 @@ export default function NavBar() {
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-amen-600 text-lg text-white shadow-sm">
             ✝
           </span>
-          <span className="hidden text-lg font-bold tracking-tight sm:inline">
-            신앙교육
-          </span>
         </Link>
 
         <div className="no-scrollbar flex flex-1 items-center gap-1 overflow-x-auto">
