@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { MENTOR_PERSONAS } from "@/lib/mentor-prompt";
+import { useMentorChat } from "@/lib/store";
 
 interface Msg {
   role: "user" | "assistant";
@@ -16,13 +18,23 @@ const SUGGESTIONS = [
 ];
 
 export default function MentorPage() {
+  const { history, loaded, save, clear, cloud } = useMentorChat();
   const [personaId, setPersonaId] = useState("default");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [seeded, setSeeded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const persona = MENTOR_PERSONAS.find((p) => p.id === personaId)!;
+
+  // 로그인 사용자는 지난 대화를 불러와 이어갑니다.
+  useEffect(() => {
+    if (loaded && !seeded && history.length > 0) {
+      setMessages(history);
+      setSeeded(true);
+    }
+  }, [loaded, seeded, history]);
 
   const scrollToBottom = () => {
     requestAnimationFrame(() => {
@@ -42,10 +54,12 @@ export default function MentorPage() {
     setInput("");
     setLoading(true);
     scrollToBottom();
+    void save(personaId, "user", content);
 
     // 멘토 응답 자리를 먼저 만들어 스트리밍으로 채웁니다.
     setMessages((m) => [...m, { role: "assistant", content: "" }]);
 
+    let assistantContent = "";
     try {
       const res = await fetch("/api/mentor", {
         method: "POST",
@@ -65,6 +79,7 @@ export default function MentorPage() {
           const { done, value } = await reader.read();
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
+          assistantContent += chunk;
           setMessages((m) => {
             const copy = [...m];
             copy[copy.length - 1] = {
@@ -75,6 +90,9 @@ export default function MentorPage() {
           });
           scrollToBottom();
         }
+      }
+      if (assistantContent.trim()) {
+        void save(personaId, "assistant", assistantContent);
       }
     } catch (err) {
       const message =
@@ -114,6 +132,34 @@ export default function MentorPage() {
             <span aria-hidden>{p.emoji}</span> {p.name}
           </button>
         ))}
+      </div>
+
+      {/* 저장 상태 */}
+      <div className="mb-3 flex items-center justify-between gap-2 text-xs text-ink/50">
+        {cloud ? (
+          <>
+            <span>💾 대화가 내 계정에 저장돼 다음에 이어서 볼 수 있어요.</span>
+            {messages.length > 0 && (
+              <button
+                onClick={() => {
+                  clear();
+                  setMessages([]);
+                }}
+                className="shrink-0 rounded-full border border-black/10 px-3 py-1 font-medium text-ink/55 transition hover:bg-black/5"
+              >
+                기록 지우기
+              </button>
+            )}
+          </>
+        ) : (
+          <span>
+            대화를 저장하려면{" "}
+            <Link href="/login" className="text-amen-600 underline">
+              로그인
+            </Link>
+            하세요. (현재는 이 세션에서만 유지됩니다)
+          </span>
+        )}
       </div>
 
       {/* 대화 영역 */}

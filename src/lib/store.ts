@@ -515,3 +515,65 @@ export function useBadges() {
 
   return cloud ? remote : local;
 }
+
+// ── AI 멘토 대화 ─────────────────────────────────────────────
+export interface MentorMsg {
+  role: "user" | "assistant";
+  content: string;
+}
+
+// 로그인 시 멘토 대화를 Supabase 에 저장/복원합니다.
+// 로그아웃 상태에서는 저장하지 않고 세션 중에만 유지됩니다.
+export function useMentorChat() {
+  const { client, user, cloud } = useCloud();
+  const [history, setHistory] = useState<MentorMsg[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!cloud || !client) {
+      setLoaded(true);
+      return;
+    }
+    let active = true;
+    client
+      .from("mentor_messages")
+      .select("role,content,created_at")
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        if (!active) return;
+        setHistory(
+          (data ?? []).map((r) => ({
+            role: (r as { role: "user" | "assistant" }).role,
+            content: (r as { content: string }).content,
+          })),
+        );
+        setLoaded(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [cloud, client]);
+
+  const save = useCallback(
+    async (personaId: string, role: "user" | "assistant", content: string) => {
+      if (cloud && client && user) {
+        await client.from("mentor_messages").insert({
+          user_id: user.id,
+          persona_id: personaId,
+          role,
+          content,
+        });
+      }
+    },
+    [cloud, client, user],
+  );
+
+  const clear = useCallback(async () => {
+    if (cloud && client && user) {
+      await client.from("mentor_messages").delete().eq("user_id", user.id);
+    }
+    setHistory([]);
+  }, [cloud, client, user]);
+
+  return { history, loaded, save, clear, cloud };
+}
