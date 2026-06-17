@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@/lib/supabase/auth";
 import type {
   Badge,
   GameResult,
@@ -103,49 +104,161 @@ function grantBadge(badgeKey: keyof typeof BADGE_DEFS) {
   write(KEYS.badges, badges);
 }
 
+// 로그인 여부를 판단하는 헬퍼
+function useCloud() {
+  const { client, user } = useAuth();
+  return { client, user, cloud: Boolean(client && user) };
+}
+
 // ── 기도노트 ─────────────────────────────────────────────────
+function mapPrayer(r: Record<string, unknown>): PrayerNote {
+  return {
+    id: String(r.id),
+    title: (r.title as string) ?? "",
+    content: (r.content as string) ?? "",
+    answered: Boolean(r.answered),
+    createdAt: (r.created_at as string) ?? new Date().toISOString(),
+  };
+}
+
 export function usePrayerNotes() {
-  const [notes, setNotes] = useCollection<PrayerNote>(KEYS.prayer);
+  const { client, user, cloud } = useCloud();
+  const [local, setLocal] = useCollection<PrayerNote>(KEYS.prayer);
+  const [remote, setRemote] = useState<PrayerNote[]>([]);
+
+  useEffect(() => {
+    if (!cloud || !client) return;
+    let active = true;
+    client
+      .from("prayer_notes")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (active) setRemote((data ?? []).map(mapPrayer));
+      });
+    return () => {
+      active = false;
+    };
+  }, [cloud, client]);
+
+  const notes = cloud ? remote : local;
 
   const add = useCallback(
-    (title: string, content: string) => {
+    async (title: string, content: string) => {
+      if (cloud && client && user) {
+        const { data } = await client
+          .from("prayer_notes")
+          .insert({
+            user_id: user.id,
+            title: title.trim() || "오늘의 기도",
+            content: content.trim(),
+            answered: false,
+          })
+          .select()
+          .single();
+        if (data) setRemote((p) => [mapPrayer(data), ...p]);
+        grantBadge("first-prayer");
+        if (remote.length + 1 >= 7) grantBadge("prayer-7");
+        return;
+      }
       const note: PrayerNote = {
         id: uid(),
-        title: title.trim(),
+        title: title.trim() || "오늘의 기도",
         content: content.trim(),
         answered: false,
         createdAt: new Date().toISOString(),
       };
       const next = [note, ...read<PrayerNote>(KEYS.prayer)];
       write(KEYS.prayer, next);
-      setNotes(next);
+      setLocal(next);
       grantBadge("first-prayer");
       if (next.length >= 7) grantBadge("prayer-7");
     },
-    [setNotes],
+    [cloud, client, user, remote.length, setLocal],
   );
 
-  const toggleAnswered = useCallback((id: string) => {
-    const next = read<PrayerNote>(KEYS.prayer).map((n) =>
-      n.id === id ? { ...n, answered: !n.answered } : n,
-    );
-    write(KEYS.prayer, next);
-  }, []);
+  const toggleAnswered = useCallback(
+    async (id: string) => {
+      if (cloud && client) {
+        const target = remote.find((n) => n.id === id);
+        if (!target) return;
+        await client
+          .from("prayer_notes")
+          .update({ answered: !target.answered })
+          .eq("id", id);
+        setRemote((p) =>
+          p.map((n) => (n.id === id ? { ...n, answered: !n.answered } : n)),
+        );
+        return;
+      }
+      const next = read<PrayerNote>(KEYS.prayer).map((n) =>
+        n.id === id ? { ...n, answered: !n.answered } : n,
+      );
+      write(KEYS.prayer, next);
+    },
+    [cloud, client, remote],
+  );
 
-  const remove = useCallback((id: string) => {
-    const next = read<PrayerNote>(KEYS.prayer).filter((n) => n.id !== id);
-    write(KEYS.prayer, next);
-  }, []);
+  const remove = useCallback(
+    async (id: string) => {
+      if (cloud && client) {
+        await client.from("prayer_notes").delete().eq("id", id);
+        setRemote((p) => p.filter((n) => n.id !== id));
+        return;
+      }
+      const next = read<PrayerNote>(KEYS.prayer).filter((n) => n.id !== id);
+      write(KEYS.prayer, next);
+    },
+    [cloud, client],
+  );
 
   return { notes, add, toggleAnswered, remove };
 }
 
 // ── 감사노트 ─────────────────────────────────────────────────
+function mapGratitude(r: Record<string, unknown>): GratitudeNote {
+  return {
+    id: String(r.id),
+    content: (r.content as string) ?? "",
+    createdAt: (r.created_at as string) ?? new Date().toISOString(),
+  };
+}
+
 export function useGratitudeNotes() {
-  const [notes, setNotes] = useCollection<GratitudeNote>(KEYS.gratitude);
+  const { client, user, cloud } = useCloud();
+  const [local, setLocal] = useCollection<GratitudeNote>(KEYS.gratitude);
+  const [remote, setRemote] = useState<GratitudeNote[]>([]);
+
+  useEffect(() => {
+    if (!cloud || !client) return;
+    let active = true;
+    client
+      .from("gratitude_notes")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (active) setRemote((data ?? []).map(mapGratitude));
+      });
+    return () => {
+      active = false;
+    };
+  }, [cloud, client]);
+
+  const notes = cloud ? remote : local;
 
   const add = useCallback(
-    (content: string) => {
+    async (content: string) => {
+      if (cloud && client && user) {
+        const { data } = await client
+          .from("gratitude_notes")
+          .insert({ user_id: user.id, content: content.trim() })
+          .select()
+          .single();
+        if (data) setRemote((p) => [mapGratitude(data), ...p]);
+        grantBadge("first-gratitude");
+        if (remote.length + 1 >= 7) grantBadge("gratitude-7");
+        return;
+      }
       const note: GratitudeNote = {
         id: uid(),
         content: content.trim(),
@@ -153,27 +266,81 @@ export function useGratitudeNotes() {
       };
       const next = [note, ...read<GratitudeNote>(KEYS.gratitude)];
       write(KEYS.gratitude, next);
-      setNotes(next);
+      setLocal(next);
       grantBadge("first-gratitude");
       if (next.length >= 7) grantBadge("gratitude-7");
     },
-    [setNotes],
+    [cloud, client, user, remote.length, setLocal],
   );
 
-  const remove = useCallback((id: string) => {
-    const next = read<GratitudeNote>(KEYS.gratitude).filter((n) => n.id !== id);
-    write(KEYS.gratitude, next);
-  }, []);
+  const remove = useCallback(
+    async (id: string) => {
+      if (cloud && client) {
+        await client.from("gratitude_notes").delete().eq("id", id);
+        setRemote((p) => p.filter((n) => n.id !== id));
+        return;
+      }
+      const next = read<GratitudeNote>(KEYS.gratitude).filter(
+        (n) => n.id !== id,
+      );
+      write(KEYS.gratitude, next);
+    },
+    [cloud, client],
+  );
 
   return { notes, add, remove };
 }
 
 // ── 말씀 묵상 ────────────────────────────────────────────────
+function mapMeditation(r: Record<string, unknown>): Meditation {
+  return {
+    id: String(r.id),
+    passageId: "",
+    reference: (r.passage as string) ?? "",
+    reflection: (r.note as string) ?? "",
+    createdAt: (r.created_at as string) ?? new Date().toISOString(),
+  };
+}
+
 export function useMeditations() {
-  const [notes, setNotes] = useCollection<Meditation>(KEYS.meditation);
+  const { client, user, cloud } = useCloud();
+  const [local, setLocal] = useCollection<Meditation>(KEYS.meditation);
+  const [remote, setRemote] = useState<Meditation[]>([]);
+
+  useEffect(() => {
+    if (!cloud || !client) return;
+    let active = true;
+    client
+      .from("meditations")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (active) setRemote((data ?? []).map(mapMeditation));
+      });
+    return () => {
+      active = false;
+    };
+  }, [cloud, client]);
+
+  const notes = cloud ? remote : local;
 
   const add = useCallback(
-    (passageId: string, reference: string, reflection: string) => {
+    async (passageId: string, reference: string, reflection: string) => {
+      if (cloud && client && user) {
+        const { data } = await client
+          .from("meditations")
+          .insert({
+            user_id: user.id,
+            passage: reference,
+            note: reflection.trim(),
+          })
+          .select()
+          .single();
+        if (data) setRemote((p) => [mapMeditation(data), ...p]);
+        grantBadge("first-meditation");
+        if (remote.length + 1 >= 7) grantBadge("meditation-7");
+        return;
+      }
       const note: Meditation = {
         id: uid(),
         passageId,
@@ -183,17 +350,25 @@ export function useMeditations() {
       };
       const next = [note, ...read<Meditation>(KEYS.meditation)];
       write(KEYS.meditation, next);
-      setNotes(next);
+      setLocal(next);
       grantBadge("first-meditation");
       if (next.length >= 7) grantBadge("meditation-7");
     },
-    [setNotes],
+    [cloud, client, user, remote.length, setLocal],
   );
 
-  const remove = useCallback((id: string) => {
-    const next = read<Meditation>(KEYS.meditation).filter((n) => n.id !== id);
-    write(KEYS.meditation, next);
-  }, []);
+  const remove = useCallback(
+    async (id: string) => {
+      if (cloud && client) {
+        await client.from("meditations").delete().eq("id", id);
+        setRemote((p) => p.filter((n) => n.id !== id));
+        return;
+      }
+      const next = read<Meditation>(KEYS.meditation).filter((n) => n.id !== id);
+      write(KEYS.meditation, next);
+    },
+    [cloud, client],
+  );
 
   return { notes, add, remove };
 }

@@ -44,12 +44,27 @@ npm run dev
 - `ANTHROPIC_MODEL` — 기본값 `claude-opus-4-8`
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — 운영 데이터베이스 (선택)
 
-### 데모 모드 vs 운영 모드
+### 데모 모드 vs 운영 모드 (인증 + 클라우드 동기화)
 
-- **데모 모드 (기본):** Supabase 환경 변수가 없으면 기도/감사/게임 기록을
-  브라우저 `localStorage` 에 저장합니다. 추가 설정 없이 바로 체험할 수 있어요.
-- **운영 모드:** `supabase/schema.sql` 을 Supabase SQL Editor 에 실행해 테이블과
-  RLS 정책을 만든 뒤, 환경 변수를 설정하면 됩니다.
+- **데모 모드:** Supabase 환경 변수가 없거나 로그아웃 상태이면, 기도/감사/묵상
+  기록을 브라우저 `localStorage` 에 저장합니다. 추가 설정 없이 바로 체험할 수
+  있어요.
+- **운영 모드:** Supabase 환경 변수가 있고 `/login` 으로 로그인하면, 기도·감사·
+  묵상 기록이 클라우드(Postgres)에 RLS 보호 하에 저장되어 어느 기기에서나
+  이어집니다.
+
+스키마는 `supabase/schema.sql` 에 있으며, 새 Supabase 프로젝트에서 SQL Editor 로
+실행하거나 Supabase CLI 로 적용하면 됩니다. 인증 흐름은 `src/lib/supabase/auth.tsx`
+(AuthProvider) + `src/middleware.ts`(세션 갱신) + `src/app/login/page.tsx` 에
+구현되어 있습니다.
+
+> 참고: 이메일+비밀번호 회원가입은 Supabase 기본 설정상 이메일 확인이 필요합니다.
+> 즉시 로그인 데모를 원하면 Supabase 대시보드 → Authentication → 이메일 확인을
+> 끄거나, 매직링크를 사용하세요.
+
+**Vercel 배포 시:** 프로젝트 Settings → Environment Variables 에
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`(+선택 `ANTHROPIC_API_KEY`)
+를 등록한 뒤 재배포하면 운영 모드가 활성화됩니다.
 
 ## AI 안전 활용 원칙
 

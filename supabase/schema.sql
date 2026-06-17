@@ -143,13 +143,17 @@ create policy "staff can read results" on game_results
 
 -- 새 사용자가 가입하면 프로필 자동 생성
 create or replace function handle_new_user()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer
+set search_path = public as $$
 begin
   insert into public.profiles (id, name)
   values (new.id, coalesce(new.raw_user_meta_data ->> 'name', ''));
   return new;
 end;
 $$;
+
+-- 이 함수는 트리거 전용입니다. PostgREST RPC 로 직접 호출되지 않도록 권한 회수.
+revoke execute on function handle_new_user() from anon, authenticated, public;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created

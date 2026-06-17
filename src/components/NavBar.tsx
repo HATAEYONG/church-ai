@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/supabase/auth";
 
 const LINKS = [
   { href: "/", label: "홈", emoji: "🏠" },
@@ -20,6 +21,7 @@ const DASH_LINKS = [
 
 export default function NavBar() {
   const pathname = usePathname();
+  const { user, configured } = useAuth();
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -69,6 +71,21 @@ export default function NavBar() {
             </Link>
           ))}
         </div>
+
+        {configured && (
+          <Link
+            href="/login"
+            title={user ? user.email ?? "내 계정" : "로그인"}
+            className={`ml-1 flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium transition ${
+              isActive("/login")
+                ? "bg-amen-600 text-white"
+                : "text-ink/60 hover:bg-black/5"
+            }`}
+          >
+            <span aria-hidden>{user ? "🙆" : "🔑"}</span>
+            <span className="hidden sm:inline">{user ? "내 계정" : "로그인"}</span>
+          </Link>
+        )}
       </nav>
     </header>
   );
