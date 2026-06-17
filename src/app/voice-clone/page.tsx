@@ -17,10 +17,14 @@ export default function VoiceClonePage() {
   const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    setMounted(true);
+    setHasApiKey(!!localStorage.getItem('ELEVENLABS_API_KEY'));
     loadClonedVoices();
   }, []);
 
@@ -142,7 +146,7 @@ export default function VoiceClonePage() {
         </div>
 
         {/* API 키 안내 */}
-        {!localStorage.getItem('ELEVENLABS_API_KEY') && (
+        {mounted && !hasApiKey && (
           <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-6 mb-8">
             <h3 className="text-lg font-semibold text-yellow-800 mb-3">
               ⚠️ API Key 필요
