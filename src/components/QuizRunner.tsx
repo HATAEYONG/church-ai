@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui";
-import { recordGameResult } from "@/lib/store";
+import { useRecordGameResult } from "@/lib/store";
 import type { GameType } from "@/lib/types";
 
 export interface QuizItem {
@@ -31,6 +31,7 @@ export default function QuizRunner({
     [items],
   );
 
+  const recordResult = useRecordGameResult();
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [correct, setCorrect] = useState(0);
@@ -47,7 +48,7 @@ export default function QuizRunner({
 
   const next = () => {
     if (isLast) {
-      recordGameResult(gameType, correct, deck.length);
+      void recordResult(gameType, correct, deck.length);
       setDone(true);
     } else {
       setIndex((n) => n + 1);

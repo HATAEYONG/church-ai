@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { useAuth } from "@/lib/supabase/auth";
 import type {
   Badge,
@@ -104,6 +105,42 @@ function grantBadge(badgeKey: keyof typeof BADGE_DEFS) {
   write(KEYS.badges, badges);
 }
 
+// 클라우드(Supabase) 변경을 다른 훅에 알려 재조회하게 합니다.
+function notifyCloud() {
+  if (typeof window !== "undefined")
+    window.dispatchEvent(new CustomEvent("amen:cloud-refresh"));
+}
+
+// 클라우드에 배지를 부여합니다(중복은 무시).
+async function grantBadgeCloud(
+  client: SupabaseClient,
+  userId: string,
+  badgeKey: keyof typeof BADGE_DEFS,
+) {
+  const def = BADGE_DEFS[badgeKey];
+  await client
+    .from("badges")
+    .upsert(
+      {
+        user_id: userId,
+        badge_type: def.type,
+        label: def.label,
+        emoji: def.emoji,
+      },
+      { onConflict: "user_id,badge_type", ignoreDuplicates: true },
+    );
+  notifyCloud();
+}
+
+// 클라우드 재조회 이벤트를 구독하는 헬퍼
+function useCloudRefresh(refetch: () => void) {
+  useEffect(() => {
+    const h = () => refetch();
+    window.addEventListener("amen:cloud-refresh", h);
+    return () => window.removeEventListener("amen:cloud-refresh", h);
+  }, [refetch]);
+}
+
 // 로그인 여부를 판단하는 헬퍼
 function useCloud() {
   const { client, user } = useAuth();
@@ -157,8 +194,9 @@ export function usePrayerNotes() {
           .select()
           .single();
         if (data) setRemote((p) => [mapPrayer(data), ...p]);
-        grantBadge("first-prayer");
-        if (remote.length + 1 >= 7) grantBadge("prayer-7");
+        await grantBadgeCloud(client, user.id, "first-prayer");
+        if (remote.length + 1 >= 7)
+          await grantBadgeCloud(client, user.id, "prayer-7");
         return;
       }
       const note: PrayerNote = {
@@ -255,8 +293,9 @@ export function useGratitudeNotes() {
           .select()
           .single();
         if (data) setRemote((p) => [mapGratitude(data), ...p]);
-        grantBadge("first-gratitude");
-        if (remote.length + 1 >= 7) grantBadge("gratitude-7");
+        await grantBadgeCloud(client, user.id, "first-gratitude");
+        if (remote.length + 1 >= 7)
+          await grantBadgeCloud(client, user.id, "gratitude-7");
         return;
       }
       const note: GratitudeNote = {
@@ -337,8 +376,9 @@ export function useMeditations() {
           .select()
           .single();
         if (data) setRemote((p) => [mapMeditation(data), ...p]);
-        grantBadge("first-meditation");
-        if (remote.length + 1 >= 7) grantBadge("meditation-7");
+        await grantBadgeCloud(client, user.id, "first-meditation");
+        if (remote.length + 1 >= 7)
+          await grantBadgeCloud(client, user.id, "meditation-7");
         return;
       }
       const note: Meditation = {
@@ -374,33 +414,104 @@ export function useMeditations() {
 }
 
 // ── 게임 결과 ────────────────────────────────────────────────
-export function useGameResults() {
-  const [results] = useCollection<GameResult>(KEYS.results);
-  return results;
+function mapResult(r: Record<string, unknown>): GameResult {
+  return {
+    id: String(r.id),
+    gameType: r.game_type as GameType,
+    correct: Number(r.correct ?? 0),
+    total: Number(r.total ?? 0),
+    createdAt: (r.created_at as string) ?? new Date().toISOString(),
+  };
 }
 
-export function recordGameResult(
-  gameType: GameType,
-  correct: number,
-  total: number,
-) {
-  const result: GameResult = {
-    id: uid(),
-    gameType,
-    correct,
-    total,
-    createdAt: new Date().toISOString(),
-  };
-  const next = [result, ...read<GameResult>(KEYS.results)];
-  write(KEYS.results, next);
-  grantBadge("game-first");
-  if (gameType === "bible-quiz" && total > 0 && correct === total) {
-    grantBadge("quiz-master");
-  }
+export function useGameResults() {
+  const { client, cloud } = useCloud();
+  const [local] = useCollection<GameResult>(KEYS.results);
+  const [remote, setRemote] = useState<GameResult[]>([]);
+
+  const refetch = useCallback(() => {
+    if (!cloud || !client) return;
+    client
+      .from("game_results")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setRemote((data ?? []).map(mapResult)));
+  }, [cloud, client]);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+  useCloudRefresh(refetch);
+
+  return cloud ? remote : local;
+}
+
+// 게임 결과 기록 — 로그인 시 Supabase, 아니면 localStorage
+export function useRecordGameResult() {
+  const { client, user, cloud } = useCloud();
+
+  return useCallback(
+    async (gameType: GameType, correct: number, total: number) => {
+      if (cloud && client && user) {
+        await client.from("game_results").insert({
+          user_id: user.id,
+          game_type: gameType,
+          correct,
+          total,
+        });
+        await grantBadgeCloud(client, user.id, "game-first");
+        if (gameType === "bible-quiz" && total > 0 && correct === total) {
+          await grantBadgeCloud(client, user.id, "quiz-master");
+        }
+        notifyCloud();
+        return;
+      }
+      const result: GameResult = {
+        id: uid(),
+        gameType,
+        correct,
+        total,
+        createdAt: new Date().toISOString(),
+      };
+      write(KEYS.results, [result, ...read<GameResult>(KEYS.results)]);
+      grantBadge("game-first");
+      if (gameType === "bible-quiz" && total > 0 && correct === total) {
+        grantBadge("quiz-master");
+      }
+    },
+    [cloud, client, user],
+  );
 }
 
 // ── 배지 ─────────────────────────────────────────────────────
+function mapBadge(r: Record<string, unknown>): Badge {
+  return {
+    id: String(r.id),
+    type: (r.badge_type as string) ?? "",
+    label: (r.label as string) ?? "",
+    emoji: (r.emoji as string) ?? "🏅",
+    earnedAt: (r.earned_at as string) ?? new Date().toISOString(),
+  };
+}
+
 export function useBadges() {
-  const [badges] = useCollection<Badge>(KEYS.badges);
-  return badges;
+  const { client, cloud } = useCloud();
+  const [local] = useCollection<Badge>(KEYS.badges);
+  const [remote, setRemote] = useState<Badge[]>([]);
+
+  const refetch = useCallback(() => {
+    if (!cloud || !client) return;
+    client
+      .from("badges")
+      .select("*")
+      .order("earned_at", { ascending: false })
+      .then(({ data }) => setRemote((data ?? []).map(mapBadge)));
+  }, [cloud, client]);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+  useCloudRefresh(refetch);
+
+  return cloud ? remote : local;
 }

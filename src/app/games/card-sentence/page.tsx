@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Card, PageHeader } from "@/components/ui";
 import { cardSentences } from "@/lib/data/games";
-import { recordGameResult } from "@/lib/store";
+import { useRecordGameResult } from "@/lib/store";
 
 function shuffleWithIndex(fragments: string[]) {
   return fragments
@@ -17,6 +17,7 @@ export default function CardSentencePage() {
     () => [...cardSentences].sort(() => Math.random() - 0.5),
     [],
   );
+  const recordResult = useRecordGameResult();
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<number[]>([]); // originalIndex 순서
   const [correct, setCorrect] = useState(0);
@@ -51,7 +52,7 @@ export default function CardSentencePage() {
 
   const next = () => {
     if (isLast) {
-      recordGameResult("card-sentence", correct, deck.length);
+      void recordResult("card-sentence", correct, deck.length);
       setDone(true);
     } else {
       setIndex((n) => n + 1);
