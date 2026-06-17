@@ -13,6 +13,7 @@ const LINKS = [
 ];
 
 const DASH_LINKS = [
+  { href: "/family", label: "가정", emoji: "👪" },
   { href: "/teacher", label: "교사", emoji: "📊" },
   { href: "/admin", label: "관리자", emoji: "⚙️" },
 ];
