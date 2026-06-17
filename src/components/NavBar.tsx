@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/", label: "홈", emoji: "🏠" },
   { href: "/prayer", label: "기도노트", emoji: "🙏" },
   { href: "/gratitude", label: "감사노트", emoji: "💛" },
+  { href: "/meditation", label: "말씀묵상", emoji: "📖" },
   { href: "/games", label: "게임학습", emoji: "🎮" },
   { href: "/mentor", label: "AI 멘토", emoji: "🕊️" },
 ];

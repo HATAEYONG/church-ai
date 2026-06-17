@@ -10,6 +10,7 @@ import {
   useBadges,
   useGameResults,
   useGratitudeNotes,
+  useMeditations,
   usePrayerNotes,
 } from "@/lib/store";
 
@@ -50,6 +51,7 @@ function careCue(s: StudentRow): string | null {
 export default function TeacherPage() {
   const { notes: myPrayers } = usePrayerNotes();
   const { notes: myGratitude } = useGratitudeNotes();
+  const { notes: myMeditations } = useMeditations();
   const myResults = useGameResults();
   const myBadges = useBadges();
 
@@ -70,7 +72,7 @@ export default function TeacherPage() {
     attendanceRate: 100,
     prayerNotes: myPrayers.length,
     gratitudeNotes: myGratitude.length,
-    meditationDone: 0,
+    meditationDone: myMeditations.length,
     quizParticipation: myResults.filter((r) => r.gameType === "bible-quiz")
       .length,
     prayerPersonAccuracy: ppAcc,
@@ -139,7 +141,8 @@ export default function TeacherPage() {
               <th className="px-3 py-3 font-medium">출석률</th>
               <th className="px-3 py-3 font-medium">🙏 기도</th>
               <th className="px-3 py-3 font-medium">💛 감사</th>
-              <th className="px-3 py-3 font-medium">📖 퀴즈</th>
+              <th className="px-3 py-3 font-medium">📖 묵상</th>
+              <th className="px-3 py-3 font-medium">🎯 퀴즈</th>
               <th className="px-3 py-3 font-medium">🙇 기도인물 정답률</th>
               <th className="px-3 py-3 font-medium">🧩 카드</th>
               <th className="px-3 py-3 font-medium">🏅 배지</th>
@@ -159,6 +162,7 @@ export default function TeacherPage() {
                 </td>
                 <td className="px-3 py-3 tabular-nums">{s.prayerNotes}</td>
                 <td className="px-3 py-3 tabular-nums">{s.gratitudeNotes}</td>
+                <td className="px-3 py-3 tabular-nums">{s.meditationDone}</td>
                 <td className="px-3 py-3 tabular-nums">
                   {s.quizParticipation}
                 </td>

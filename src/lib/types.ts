@@ -16,6 +16,14 @@ export interface GratitudeNote {
   createdAt: string; // ISO
 }
 
+export interface Meditation {
+  id: string;
+  passageId: string;
+  reference: string;
+  reflection: string; // 사용자가 작성한 묵상
+  createdAt: string; // ISO
+}
+
 export type GameType = "bible-quiz" | "prayer-person" | "card-sentence";
 
 export interface GameResult {

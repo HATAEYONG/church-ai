@@ -6,6 +6,7 @@ import {
   useBadges,
   useGameResults,
   useGratitudeNotes,
+  useMeditations,
   usePrayerNotes,
 } from "@/lib/store";
 
@@ -21,6 +22,12 @@ const FEATURES = [
     emoji: "💛",
     title: "감사노트",
     desc: "하루의 감사를 기록하면 은혜의 기억이 됩니다.",
+  },
+  {
+    href: "/meditation",
+    emoji: "📖",
+    title: "말씀 묵상",
+    desc: "오늘의 말씀을 읽고 묵상 질문을 따라 마음을 정리해요.",
   },
   {
     href: "/games",
@@ -45,6 +52,7 @@ function todayCount(items: { createdAt: string }[]) {
 export default function HomePage() {
   const { notes: prayers } = usePrayerNotes();
   const { notes: gratitude } = useGratitudeNotes();
+  const { notes: meditations } = useMeditations();
   const results = useGameResults();
   const badges = useBadges();
 
@@ -83,17 +91,20 @@ export default function HomePage() {
       {/* 나의 신앙 기록 요약 */}
       <section>
         <h2 className="mb-3 text-lg font-bold">나의 신앙 기록</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <StatPill emoji="🙏" label="기도 기록" value={prayers.length} />
           <StatPill emoji="💛" label="감사 기록" value={gratitude.length} />
+          <StatPill emoji="📖" label="말씀 묵상" value={meditations.length} />
           <StatPill emoji="🎯" label="게임 참여" value={results.length} />
           <StatPill emoji="🏅" label="획득 배지" value={badges.length} />
         </div>
         <div className="mt-3 rounded-2xl border border-black/5 bg-white p-4 text-sm text-ink/70 shadow-sm">
-          오늘 기도 {todayCount(prayers)}개 · 오늘 감사 {todayCount(gratitude)}
-          개를 기록했어요.{" "}
-          {todayCount(prayers) + todayCount(gratitude) === 0 &&
-            "오늘의 첫 기록을 남겨볼까요?"}
+          오늘 기도 {todayCount(prayers)}개 · 감사 {todayCount(gratitude)}개 ·
+          묵상 {todayCount(meditations)}개를 기록했어요.{" "}
+          {todayCount(prayers) +
+            todayCount(gratitude) +
+            todayCount(meditations) ===
+            0 && "오늘의 첫 기록을 남겨볼까요?"}
         </div>
       </section>
 

@@ -6,6 +6,7 @@ import type {
   GameResult,
   GameType,
   GratitudeNote,
+  Meditation,
   PrayerNote,
 } from "@/lib/types";
 
@@ -20,6 +21,7 @@ import type {
 const KEYS = {
   prayer: "amen:prayers",
   gratitude: "amen:gratitude",
+  meditation: "amen:meditations",
   results: "amen:results",
   badges: "amen:badges",
 } as const;
@@ -83,6 +85,12 @@ const BADGE_DEFS: Record<string, Omit<Badge, "id" | "earnedAt">> = {
     emoji: "💛",
   },
   "gratitude-7": { type: "gratitude-7", label: "감사 7일", emoji: "🌻" },
+  "first-meditation": {
+    type: "first-meditation",
+    label: "첫 말씀 묵상",
+    emoji: "📖",
+  },
+  "meditation-7": { type: "meditation-7", label: "말씀 묵상 7일", emoji: "🌿" },
   "quiz-master": { type: "quiz-master", label: "성경퀴즈 만점", emoji: "🏆" },
   "game-first": { type: "game-first", label: "첫 게임 도전", emoji: "🎮" },
 };
@@ -155,6 +163,36 @@ export function useGratitudeNotes() {
   const remove = useCallback((id: string) => {
     const next = read<GratitudeNote>(KEYS.gratitude).filter((n) => n.id !== id);
     write(KEYS.gratitude, next);
+  }, []);
+
+  return { notes, add, remove };
+}
+
+// ── 말씀 묵상 ────────────────────────────────────────────────
+export function useMeditations() {
+  const [notes, setNotes] = useCollection<Meditation>(KEYS.meditation);
+
+  const add = useCallback(
+    (passageId: string, reference: string, reflection: string) => {
+      const note: Meditation = {
+        id: uid(),
+        passageId,
+        reference,
+        reflection: reflection.trim(),
+        createdAt: new Date().toISOString(),
+      };
+      const next = [note, ...read<Meditation>(KEYS.meditation)];
+      write(KEYS.meditation, next);
+      setNotes(next);
+      grantBadge("first-meditation");
+      if (next.length >= 7) grantBadge("meditation-7");
+    },
+    [setNotes],
+  );
+
+  const remove = useCallback((id: string) => {
+    const next = read<Meditation>(KEYS.meditation).filter((n) => n.id !== id);
+    write(KEYS.meditation, next);
   }, []);
 
   return { notes, add, remove };
