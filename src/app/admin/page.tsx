@@ -48,7 +48,7 @@ export default function AdminPage() {
 
       <div className="mb-4">
         <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs text-ink/50">
-          예시 데이터 · 중문교회
+          예시 데이터
         </span>
       </div>
 
