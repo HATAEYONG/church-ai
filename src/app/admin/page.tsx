@@ -2,6 +2,7 @@
 
 import { Card, PageHeader, StatPill } from "@/components/ui";
 import { sampleDepartments } from "@/lib/data/dashboard";
+import { useStaffData } from "@/lib/store";
 
 function Bar({ value, tone }: { value: number; tone: string }) {
   return (
@@ -20,21 +21,24 @@ function Bar({ value, tone }: { value: number; tone: string }) {
 }
 
 export default function AdminPage() {
-  const totalMembers = sampleDepartments.reduce((s, d) => s + d.members, 0);
-  const totalPrayer = sampleDepartments.reduce((s, d) => s + d.prayerTotal, 0);
-  const totalGratitude = sampleDepartments.reduce(
-    (s, d) => s + d.gratitudeTotal,
-    0,
-  );
-  const avgActive = Math.round(
-    sampleDepartments.reduce((s, d) => s + d.activeRate, 0) /
-      sampleDepartments.length,
-  );
+  // 관리자로 로그인하면 실제 부서 집계를, 아니면 예시 데이터를 사용합니다.
+  const { departments: realDeps } = useStaffData();
+  const usingReal = Boolean(realDeps && realDeps.length > 0);
+  const departments = usingReal ? realDeps! : sampleDepartments;
 
-  const mostActive = [...sampleDepartments].sort(
+  const totalMembers = departments.reduce((s, d) => s + d.members, 0);
+  const totalPrayer = departments.reduce((s, d) => s + d.prayerTotal, 0);
+  const totalGratitude = departments.reduce((s, d) => s + d.gratitudeTotal, 0);
+  const avgActive = departments.length
+    ? Math.round(
+        departments.reduce((s, d) => s + d.activeRate, 0) / departments.length,
+      )
+    : 0;
+
+  const mostActive = [...departments].sort(
     (a, b) => b.activeRate - a.activeRate,
   )[0];
-  const needsCare = [...sampleDepartments].sort(
+  const needsCare = [...departments].sort(
     (a, b) => a.meditationRate - b.meditationRate,
   )[0];
 
@@ -47,9 +51,15 @@ export default function AdminPage() {
       />
 
       <div className="mb-4">
-        <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs text-ink/50">
-          예시 데이터 · 중문교회
-        </span>
+        {usingReal ? (
+          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-700">
+            실데이터 · 우리 교회
+          </span>
+        ) : (
+          <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs text-ink/50">
+            예시 데이터 · 중문교회
+          </span>
+        )}
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -97,7 +107,7 @@ export default function AdminPage() {
             </tr>
           </thead>
           <tbody>
-            {sampleDepartments.map((d) => (
+            {departments.map((d) => (
               <tr
                 key={d.id}
                 className="border-b border-black/5 last:border-0"

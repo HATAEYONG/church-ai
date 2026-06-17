@@ -115,6 +115,26 @@ create policy "own badges" on badges
 create policy "own mentor msgs" on mentor_messages
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- 교직원(teacher/admin) 여부를 RLS 재귀 없이 판단하는 헬퍼
+create or replace function public.is_staff()
+returns boolean language sql security definer stable
+set search_path = public as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role in ('teacher', 'admin')
+  );
+$$;
+revoke execute on function public.is_staff() from anon, public;
+grant execute on function public.is_staff() to authenticated;
+
+-- 교직원은 대시보드를 위해 학생 프로필/묵상/배지를 읽을 수 있음
+create policy "staff read profiles" on profiles
+  for select using (public.is_staff());
+create policy "staff read meditations" on meditations
+  for select using (public.is_staff());
+create policy "staff read badges" on badges
+  for select using (public.is_staff());
+
 -- 교사/관리자는 학생 기록을 읽을 수 있음 (대시보드용)
 -- 참고: 운영 시에는 부서/반 범위로 더 좁히는 것을 권장합니다.
 create policy "staff can read prayer" on prayer_notes

@@ -12,6 +12,7 @@ import {
   useGratitudeNotes,
   useMeditations,
   usePrayerNotes,
+  useStaffData,
 } from "@/lib/store";
 
 function Bar({ value, tone = "amen" }: { value: number; tone?: string }) {
@@ -81,7 +82,12 @@ export default function TeacherPage() {
     badges: myBadges.length,
   };
 
-  const students = [me, ...sampleStudents];
+  // 교직원으로 로그인하면 실제 학생 데이터를, 아니면 예시 데이터를 사용합니다.
+  const { students: realStudents, isStaff } = useStaffData();
+  const usingReal = Boolean(realStudents && realStudents.length > 0);
+  const students = usingReal
+    ? (realStudents as StudentRow[])
+    : [me, ...sampleStudents];
   const avgAttendance = Math.round(
     students.reduce((s, x) => s + x.attendanceRate, 0) / students.length,
   );
@@ -101,11 +107,22 @@ export default function TeacherPage() {
       />
 
       <div className="mb-4 text-sm text-ink/60">
-        {sampleClass.department} · {sampleClass.className} ·{" "}
-        {sampleClass.teacher}
-        <span className="ml-2 rounded-full bg-black/5 px-2 py-0.5 text-xs">
-          예시 데이터 + 내 활동
-        </span>
+        {usingReal ? (
+          <>
+            우리 교회 학생 {students.length}명 · 실시간 데이터
+            <span className="ml-2 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-700">
+              실데이터
+            </span>
+          </>
+        ) : (
+          <>
+            {sampleClass.department} · {sampleClass.className} ·{" "}
+            {sampleClass.teacher}
+            <span className="ml-2 rounded-full bg-black/5 px-2 py-0.5 text-xs">
+              {isStaff ? "학생 기록 대기 중 · 예시 데이터" : "예시 데이터 + 내 활동"}
+            </span>
+          </>
+        )}
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">

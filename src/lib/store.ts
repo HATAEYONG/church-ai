@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useAuth } from "@/lib/supabase/auth";
+import type { DepartmentRow, StudentRow } from "@/lib/data/dashboard";
 import type {
   Badge,
   GameResult,
@@ -576,4 +577,144 @@ export function useMentorChat() {
   }, [cloud, client, user]);
 
   return { history, loaded, save, clear, cloud };
+}
+
+// ── 교사/관리자 대시보드: 실제 학생 데이터 ─────────────────────
+// 로그인 + 교직원(teacher/admin)일 때만 Supabase 에서 실데이터를 집계합니다.
+// 그렇지 않으면 null 을 반환해 대시보드가 예시 데이터로 폴백합니다.
+function activeRate7d(dates: string[]): number {
+  const weekAgo = Date.now() - 7 * 86400000;
+  const days = new Set(
+    dates
+      .filter((d) => new Date(d).getTime() >= weekAgo)
+      .map((d) => new Date(d).toDateString()),
+  );
+  return Math.round((days.size / 7) * 100);
+}
+
+export function useStaffData() {
+  const { client, user, cloud } = useCloud();
+  const [students, setStudents] = useState<StudentRow[] | null>(null);
+  const [departments, setDepartments] = useState<DepartmentRow[] | null>(null);
+  const [isStaff, setIsStaff] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!cloud || !client || !user) return;
+    let active = true;
+    (async () => {
+      setLoading(true);
+      const { data: me } = await client
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+      const staff =
+        (me as { role?: string } | null)?.role === "teacher" ||
+        (me as { role?: string } | null)?.role === "admin";
+      if (!active) return;
+      setIsStaff(staff);
+      if (!staff) {
+        setLoading(false);
+        return;
+      }
+
+      const [pr, pn, gn, md, gr, bd] = await Promise.all([
+        client.from("profiles").select("id,name,role,department,class_name"),
+        client.from("prayer_notes").select("user_id,created_at"),
+        client.from("gratitude_notes").select("user_id,created_at"),
+        client.from("meditations").select("user_id,created_at"),
+        client.from("game_results").select("user_id,game_type,correct,total"),
+        client.from("badges").select("user_id"),
+      ]);
+      if (!active) return;
+
+      type Row = Record<string, unknown>;
+      const profiles = (pr.data ?? []) as Row[];
+      const by = <T extends Row>(rows: T[]) => {
+        const m = new Map<string, T[]>();
+        for (const r of rows) {
+          const k = String(r.user_id);
+          (m.get(k) ?? m.set(k, []).get(k)!).push(r);
+        }
+        return m;
+      };
+      const prayers = by((pn.data ?? []) as Row[]);
+      const grats = by((gn.data ?? []) as Row[]);
+      const meds = by((md.data ?? []) as Row[]);
+      const results = by((gr.data ?? []) as Row[]);
+      const badges = by((bd.data ?? []) as Row[]);
+
+      const learners = profiles.filter(
+        (p) => p.role !== "teacher" && p.role !== "admin",
+      );
+
+      const rows: StudentRow[] = learners.map((p) => {
+        const id = String(p.id);
+        const pRows = prayers.get(id) ?? [];
+        const gRows = grats.get(id) ?? [];
+        const mRows = meds.get(id) ?? [];
+        const res = results.get(id) ?? [];
+        const pp = res.filter((r) => r.game_type === "prayer-person");
+        const ppTotal = pp.reduce((s, r) => s + Number(r.total ?? 0), 0);
+        const ppCorrect = pp.reduce((s, r) => s + Number(r.correct ?? 0), 0);
+        const allDates = [
+          ...pRows.map((r) => String(r.created_at)),
+          ...gRows.map((r) => String(r.created_at)),
+          ...mRows.map((r) => String(r.created_at)),
+        ];
+        return {
+          id,
+          name: (p.name as string)?.trim() || "이름 미설정",
+          attendanceRate: activeRate7d(allDates),
+          prayerNotes: pRows.length,
+          gratitudeNotes: gRows.length,
+          meditationDone: mRows.length,
+          quizParticipation: res.filter((r) => r.game_type === "bible-quiz")
+            .length,
+          prayerPersonAccuracy:
+            ppTotal > 0 ? Math.round((ppCorrect / ppTotal) * 100) : 0,
+          cardSentencePlays: res.filter((r) => r.game_type === "card-sentence")
+            .length,
+          badges: (badges.get(id) ?? []).length,
+        };
+      });
+
+      // 부서별 집계
+      const depMap = new Map<string, StudentRow[]>();
+      learners.forEach((p, i) => {
+        const dep = (p.department as string)?.trim() || "미지정";
+        const row = rows[i];
+        (depMap.get(dep) ?? depMap.set(dep, []).get(dep)!).push(row);
+      });
+      const deps: DepartmentRow[] = [...depMap.entries()].map(
+        ([name, members], i) => {
+          const n = members.length || 1;
+          return {
+            id: `dep-${i}`,
+            name,
+            members: members.length,
+            activeRate: Math.round(
+              members.reduce((s, m) => s + m.attendanceRate, 0) / n,
+            ),
+            prayerTotal: members.reduce((s, m) => s + m.prayerNotes, 0),
+            gratitudeTotal: members.reduce((s, m) => s + m.gratitudeNotes, 0),
+            meditationRate: Math.round(
+              (members.filter((m) => m.meditationDone > 0).length / n) * 100,
+            ),
+          };
+        },
+      );
+
+      if (!active) return;
+      setStudents(rows);
+      setDepartments(deps);
+      setLoading(false);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [cloud, client, user]);
+
+  return { students, departments, isStaff, loading };
 }
