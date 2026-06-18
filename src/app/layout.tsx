@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import NavBar from "@/components/NavBar";
 import PWARegister from "@/components/PWARegister";
+import DemoSeeder from "@/components/DemoSeeder";
 import { AuthProvider } from "@/lib/supabase/auth";
 
 export const metadata: Metadata = {
@@ -36,6 +37,7 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <PWARegister />
+          <DemoSeeder />
           <NavBar />
           <main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">{children}</main>
           <footer className="mx-auto max-w-5xl px-4 pb-10 pt-6 text-center text-xs text-ink/40">

@@ -25,6 +25,7 @@ import {
   setStoredElevenLabsKey,
   clearStoredElevenLabsKey,
 } from "@/lib/elevenlabs";
+import { seedDemoData, clearDemoData } from "@/lib/data/demo-seed";
 
 interface KeyFieldProps {
   title: string;
@@ -208,6 +209,49 @@ function ProviderOrderCard({ refreshKey }: { refreshKey: number }) {
   );
 }
 
+function DemoDataCard() {
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const flash = (text: string) => {
+    setMsg(text);
+    setTimeout(() => setMsg(null), 2500);
+  };
+
+  return (
+    <Card className="bg-amen-50/50">
+      <h2 className="flex items-center gap-2 font-bold">
+        <span aria-hidden>🎬</span>
+        데모 데이터 (고객 시연용)
+      </h2>
+      <p className="mt-1 text-xs text-ink/50">
+        기도·감사·묵상·게임·배지에 샘플 기록을 채워 홈·교사·가정 화면이 완성된
+        모습으로 보이게 합니다. 시연 후 비우면 깨끗한 상태로 돌아갑니다.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          onClick={() => {
+            seedDemoData(true);
+            flash("샘플 데이터를 채웠어요. 각 메뉴에서 확인해 보세요.");
+          }}
+          className="rounded-full bg-amen-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-amen-700"
+        >
+          데모 데이터 채우기
+        </button>
+        <button
+          onClick={() => {
+            clearDemoData();
+            flash("데모 데이터를 비웠어요.");
+          }}
+          className="rounded-full border border-black/10 bg-white px-5 py-2.5 text-sm font-medium text-ink/70 transition hover:bg-black/5"
+        >
+          비우기
+        </button>
+      </div>
+      {msg && <p className="mt-2 text-sm text-amen-700">{msg}</p>}
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   // 키 변경 시 검색순서 카드의 연결 상태를 갱신하기 위한 신호
   const [keyRev, setKeyRev] = useState(0);
@@ -262,6 +306,7 @@ export default function SettingsPage() {
           write={setStoredElevenLabsKey}
           clear={clearStoredElevenLabsKey}
         />
+        <DemoDataCard />
       </div>
 
       <p className="mt-4 text-center text-xs text-ink/40">
