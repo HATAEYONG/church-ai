@@ -1,5 +1,14 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { MENTOR_SYSTEM_PROMPT, MENTOR_PERSONAS } from "@/lib/mentor-prompt";
+import {
+  MENTOR_SYSTEM_PROMPT,
+  MENTOR_PERSONAS,
+  getMockMentorReply,
+} from "@/lib/mentor-prompt";
+import {
+  ANTHROPIC_MODEL,
+  createAnthropic,
+  resolveAnthropicKey,
+} from "@/lib/anthropic";
+import { clientKey, rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,20 +18,29 @@ interface ChatMessage {
   content: string;
 }
 
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// 목업(데모) 응답을 자연스럽게 스트리밍합니다.
+function streamMock(text: string): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      for (let i = 0; i < text.length; i += 24) {
+        controller.enqueue(encoder.encode(text.slice(i, i + 24)));
+        await sleep(20);
+      }
+      controller.close();
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+    },
+  });
+}
 
 export async function POST(req: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return Response.json(
-      {
-        error:
-          "AI 멘토를 사용하려면 ANTHROPIC_API_KEY 환경 변수가 필요합니다. .env.local 을 설정해 주세요.",
-      },
-      { status: 503 },
-    );
-  }
-
   let body: { messages?: ChatMessage[]; personaId?: string };
   try {
     body = await req.json();
@@ -41,33 +59,57 @@ export async function POST(req: Request) {
     return Response.json({ error: "메시지가 비어 있습니다." }, { status: 400 });
   }
 
-  const persona = MENTOR_PERSONAS.find((p) => p.id === body.personaId);
+  // 남용·과도한 비용을 막기 위한 입력 한도(인증 없는 공개 엔드포인트).
+  if (messages.length > 50) {
+    return Response.json(
+      { error: "대화가 너무 깁니다. 새 대화를 시작해 주세요." },
+      { status: 400 },
+    );
+  }
+  if (messages.some((m) => m.content.length > 8000)) {
+    return Response.json(
+      { error: "메시지가 너무 깁니다. 조금 줄여서 보내 주세요." },
+      { status: 400 },
+    );
+  }
+
+  const personaId = body.personaId ?? "default";
+  const apiKey = resolveAnthropicKey(req);
+
+  // 키가 없으면 목업(데모) 응답으로 동작
+  if (!apiKey) {
+    return streamMock(getMockMentorReply(personaId));
+  }
+
+  // 실제 호출 경로 — 업체 키/비용 보호용 레이트리밋
+  const rl = rateLimit(clientKey(req, "mentor"), 30, 60_000);
+  if (!rl.ok) {
+    return Response.json(
+      { error: "요청이 너무 많아요. 잠시 후 다시 시도해 주세요." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter ?? 30) } },
+    );
+  }
+
+  const persona = MENTOR_PERSONAS.find((p) => p.id === personaId);
   const system = persona?.prompt
     ? `${MENTOR_SYSTEM_PROMPT}\n\n## 이번 대화의 멘토\n${persona.prompt}`
     : MENTOR_SYSTEM_PROMPT;
 
-  const client = new Anthropic({ apiKey });
+  const client = createAnthropic(apiKey);
+  const encoder = new TextEncoder();
 
   // 스트리밍으로 응답을 전달해 긴 응답에서도 타임아웃 없이 동작하게 합니다.
-  const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       try {
         const claudeStream = client.messages.stream({
-          model: MODEL,
-          max_tokens: 1024,
+          model: ANTHROPIC_MODEL,
+          max_tokens: 2048,
           system: [
-            {
-              type: "text",
-              text: system,
-              cache_control: { type: "ephemeral" },
-            },
+            { type: "text", text: system, cache_control: { type: "ephemeral" } },
           ],
           thinking: { type: "adaptive" },
-          messages: messages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
         });
 
         claudeStream.on("text", (delta) => {

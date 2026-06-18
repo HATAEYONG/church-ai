@@ -13,6 +13,8 @@
 # misc
 .DS_Store
 *.pem
+# Windows 셸 리다이렉트(`> nul`)로 생기는 쓰레기 파일
+nul
 
 # debug
 npm-debug.log*
@@ -25,6 +27,9 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# claude code 로컬 설정/도구
+.claude
 
 # typescript
 *.tsbuildinfo

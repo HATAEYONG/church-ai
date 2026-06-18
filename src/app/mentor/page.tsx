@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { MENTOR_PERSONAS } from "@/lib/mentor-prompt";
 import { useMentorChat } from "@/lib/store";
+import { aiKeyHeaders } from "@/lib/ai-config";
 
 interface Msg {
   role: "user" | "assistant";
@@ -63,7 +64,7 @@ export default function MentorPage() {
     try {
       const res = await fetch("/api/mentor", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...aiKeyHeaders() },
         body: JSON.stringify({ messages: nextMessages, personaId }),
       });
 

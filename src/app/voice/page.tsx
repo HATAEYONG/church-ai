@@ -129,7 +129,7 @@ export default function VoicePage() {
           </h3>
           <ul className="space-y-2 text-blue-700">
             <li>• 샘플 텍스트를 선택하거나 직접 텍스트를 입력하세요</li>
-            <li>• '음성 듣기' 버튼을 클릭하면 AI 목소리로 읽어줍니다</li>
+            <li>• &apos;음성 듣기&apos; 버튼을 클릭하면 AI 목소리로 읽어줍니다</li>
             <li>• 다양한 목소리는 설정 페이지에서 선택할 수 있습니다</li>
             <li>• 기도/감사 노트, AI 멘토, 성경 읽기 등에서 음성 기능을 사용할 수 있습니다</li>
           </ul>

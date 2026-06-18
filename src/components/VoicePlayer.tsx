@@ -44,8 +44,11 @@ export default function VoicePlayer({
     onPlayStart?.();
 
     try {
-      await playTTS(text);
-      setIsPlaying(true);
+      // 실제 재생이 시작되면 로딩 → 재생 상태로 전환
+      await playTTS(text, undefined, () => {
+        setIsLoading(false);
+        setIsPlaying(true);
+      });
       onPlayEnd?.();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '음성 재생 실패';

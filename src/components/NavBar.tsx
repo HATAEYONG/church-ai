@@ -14,9 +14,11 @@ const LINKS = [
 ];
 
 const DASH_LINKS = [
+  { href: "/sermon", label: "설교준비", emoji: "📝" },
   { href: "/family", label: "가정", emoji: "👪" },
   { href: "/teacher", label: "교사", emoji: "📊" },
   { href: "/admin", label: "관리자", emoji: "⚙️" },
+  { href: "/settings", label: "설정", emoji: "🔧" },
 ];
 
 export default function NavBar() {

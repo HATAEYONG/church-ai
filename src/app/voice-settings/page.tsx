@@ -8,6 +8,11 @@
 
 import { useState, useEffect } from 'react';
 import VoicePlayer from '@/components/VoicePlayer';
+import {
+  getStoredElevenLabsKey,
+  setStoredElevenLabsKey,
+  clearStoredElevenLabsKey,
+} from '@/lib/elevenlabs';
 
 interface VoiceSettings {
   voiceId: string;
@@ -23,6 +28,12 @@ export default function VoiceSettingsPage() {
   });
 
   const [testText, setTestText] = useState('안녕하세요? 저는 당신의 AI 목소리입니다. 이 목소리가 마음에 드시나요?');
+
+  // ElevenLabs API 키 (없으면 브라우저 음성 목업 모드)
+  const [apiKey, setApiKey] = useState('');
+  const [hasKey, setHasKey] = useState(false);
+  const [keySaved, setKeySaved] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const defaultVoices = [
     {
@@ -61,7 +72,26 @@ export default function VoiceSettingsPage() {
         console.error('클로닝된 목소리 불러오기 실패:', error);
       }
     }
+
+    // 저장된 API 키 불러오기
+    const storedKey = getStoredElevenLabsKey();
+    setApiKey(storedKey);
+    setHasKey(storedKey.length > 0);
+    setMounted(true);
   }, []);
+
+  const handleSaveKey = () => {
+    setStoredElevenLabsKey(apiKey);
+    setHasKey(apiKey.trim().length > 0);
+    setKeySaved(true);
+    setTimeout(() => setKeySaved(false), 2500);
+  };
+
+  const handleClearKey = () => {
+    clearStoredElevenLabsKey();
+    setApiKey('');
+    setHasKey(false);
+  };
 
   const handleVoiceChange = (voiceId: string, type: 'male' | 'female' | 'custom') => {
     setSettings({ ...settings, voiceId, voiceType: type });
@@ -94,6 +124,46 @@ export default function VoiceSettingsPage() {
           </p>
         </div>
 
+        {/* API 키 설정 */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-2 text-gray-800">
+            🔑 ElevenLabs API 키
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            {mounted && hasKey
+              ? '✅ 연결됨 — ElevenLabs 고품질 음성으로 재생됩니다.'
+              : '🧪 목업 모드 — 키가 없어도 브라우저 내장 음성으로 바로 들어볼 수 있어요. 아래에 키를 입력하면 고품질 음성으로 전환됩니다.'}
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="ElevenLabs API Key 붙여넣기"
+              className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none"
+            />
+            <button
+              onClick={handleSaveKey}
+              className="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+            >
+              저장
+            </button>
+            <button
+              onClick={handleClearKey}
+              className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              삭제
+            </button>
+          </div>
+          {keySaved && (
+            <p className="mt-2 text-sm text-green-600">저장되었습니다!</p>
+          )}
+          <p className="mt-3 text-xs text-gray-400">
+            키 발급: https://elevenlabs.io → Settings → API Keys · 입력한 키는 이
+            브라우저에만 저장됩니다.
+          </p>
+        </div>
+
         {/* 기본 목소리 선택 */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4 text-gray-800">
@@ -101,10 +171,18 @@ export default function VoiceSettingsPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {defaultVoices.map((voice) => (
-              <button
+              <div
                 key={voice.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => handleVoiceChange(voice.id, voice.type as 'male' | 'female')}
-                className={`p-6 rounded-lg border-2 text-left transition-all ${
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleVoiceChange(voice.id, voice.type as 'male' | 'female');
+                  }
+                }}
+                className={`cursor-pointer p-6 rounded-lg border-2 text-left transition-all ${
                   settings.voiceId === voice.id
                     ? 'border-purple-500 bg-purple-50'
                     : 'border-gray-200 hover:border-purple-300'
@@ -126,7 +204,7 @@ export default function VoiceSettingsPage() {
                     className="w-full"
                   />
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>

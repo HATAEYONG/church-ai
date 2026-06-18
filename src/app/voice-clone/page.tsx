@@ -152,18 +152,25 @@ export default function VoiceClonePage() {
               ⚠️ API Key 필요
             </h3>
             <p className="text-yellow-700 mb-4">
-              보이스 클로닝 기능을 사용하려면 ElevenLabs API Key가 필요합니다.
+              보이스 클로닝(내 목소리 생성)은 ElevenLabs API Key가 필요합니다. 목소리
+              설정 페이지에서 키를 입력해 주세요. (키가 없어도 음성 듣기는 브라우저
+              음성으로 동작합니다.)
             </p>
             <div className="bg-yellow-100 p-4 rounded-lg">
               <p className="text-sm text-yellow-800 mb-2">
                 <strong>API Key 발급 방법:</strong>
               </p>
               <ol className="text-sm text-yellow-700 list-decimal list-inside space-y-1">
-                <li>https://elevenlabs.io 접속</li>
-                <li>회원가입 (무료 플랜 가능)</li>
-                <li>Settings → API Keys</li>
-                <li>생성된 키를 아래 입력란에 붙여넣기</li>
+                <li>https://elevenlabs.io 접속 후 회원가입 (무료 플랜 가능)</li>
+                <li>Settings → API Keys 에서 키 생성</li>
+                <li>아래 버튼으로 목소리 설정 페이지에서 키 입력</li>
               </ol>
+              <a
+                href="/voice-settings"
+                className="mt-3 inline-block px-5 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors text-sm font-medium"
+              >
+                🔑 목소리 설정에서 키 입력하기
+              </a>
             </div>
           </div>
         )}

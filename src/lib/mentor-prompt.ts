@@ -37,6 +37,20 @@ export interface MentorPersona {
   prompt: string;
 }
 
+// 목업(데모) 응답 — API 키가 없을 때 멘토가 어떻게 동작하는지 체험용으로 보여줍니다.
+// 실제 답변이 아님을 분명히 밝힙니다.
+export function getMockMentorReply(personaId: string): string {
+  const persona = MENTOR_PERSONAS.find((p) => p.id === personaId);
+  const who = persona && persona.id !== "default" ? `${persona.name}의 마음을 빌려 ` : "";
+  return (
+    `(🧪 데모 예시 응답입니다 — 실제 AI 멘토 대화를 사용하려면 설정에서 Anthropic API 키를 연결해 주세요.)\n\n` +
+    `${who}함께 이 묵상을 나누고 싶어요. 지금 마음에 떠오른 그 생각을 하나님 앞에 솔직하게 펼쳐 놓는 것에서 기도는 시작됩니다. ` +
+    `오늘 읽은 말씀 한 구절을 천천히 다시 읽으며, 그 말씀이 내 하루의 어디에 닿는지 떠올려 보세요.\n\n` +
+    `🪞 묵상 질문: 오늘 하나님께 가장 솔직하게 드리고 싶은 한 문장은 무엇인가요?\n\n` +
+    `※ 깊은 고민이나 교리적 판단은 부모님·교사·목회자와 꼭 함께 나누어요.`
+  );
+}
+
 export const MENTOR_PERSONAS: MentorPersona[] = [
   {
     id: "default",
