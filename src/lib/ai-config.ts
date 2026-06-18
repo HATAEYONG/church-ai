@@ -5,9 +5,10 @@
 
 export const ANTHROPIC_KEY_STORAGE = "ANTHROPIC_API_KEY";
 export const OPENAI_KEY_STORAGE = "OPENAI_API_KEY";
+export const GEMINI_KEY_STORAGE = "GEMINI_API_KEY";
 export const PROVIDER_ORDER_STORAGE = "AI_PROVIDER_ORDER";
 
-export type ProviderId = "anthropic" | "openai";
+export type ProviderId = "anthropic" | "openai" | "gemini";
 
 export interface ProviderMeta {
   id: ProviderId;
@@ -32,9 +33,16 @@ export const PROVIDERS: ProviderMeta[] = [
     usedFor: "AI 신앙 멘토 · 설교 준비 자동화",
     signup: "platform.openai.com",
   },
+  {
+    id: "gemini",
+    label: "Google (Gemini)",
+    emoji: "🔷",
+    usedFor: "AI 신앙 멘토 · 설교 준비 자동화",
+    signup: "aistudio.google.com",
+  },
 ];
 
-export const DEFAULT_ORDER: ProviderId[] = ["anthropic", "openai"];
+export const DEFAULT_ORDER: ProviderId[] = ["anthropic", "openai", "gemini"];
 
 // ── 키 저장소 ────────────────────────────────────────────────
 function readKey(storage: string): string {
@@ -61,18 +69,26 @@ export const getStoredOpenAIKey = () => readKey(OPENAI_KEY_STORAGE);
 export const setStoredOpenAIKey = (k: string) => writeKey(OPENAI_KEY_STORAGE, k);
 export const clearStoredOpenAIKey = () => writeKey(OPENAI_KEY_STORAGE, "");
 
+export const getStoredGeminiKey = () => readKey(GEMINI_KEY_STORAGE);
+export const setStoredGeminiKey = (k: string) => writeKey(GEMINI_KEY_STORAGE, k);
+export const clearStoredGeminiKey = () => writeKey(GEMINI_KEY_STORAGE, "");
+
+const KEY_STORAGE: Record<ProviderId, string> = {
+  anthropic: ANTHROPIC_KEY_STORAGE,
+  openai: OPENAI_KEY_STORAGE,
+  gemini: GEMINI_KEY_STORAGE,
+};
+
 export function getStoredKey(id: ProviderId): string {
-  return id === "openai" ? getStoredOpenAIKey() : getStoredAnthropicKey();
+  return readKey(KEY_STORAGE[id]);
 }
 
 export function setStoredKey(id: ProviderId, key: string): void {
-  if (id === "openai") setStoredOpenAIKey(key);
-  else setStoredAnthropicKey(key);
+  writeKey(KEY_STORAGE[id], key);
 }
 
 export function clearStoredKey(id: ProviderId): void {
-  if (id === "openai") clearStoredOpenAIKey();
-  else clearStoredAnthropicKey();
+  writeKey(KEY_STORAGE[id], "");
 }
 
 // ── 제공자 검색순서 ──────────────────────────────────────────
@@ -90,9 +106,10 @@ export function getProviderOrder(): ProviderId[] {
   }
   const order: ProviderId[] = [];
   const seen = new Set<ProviderId>();
+  const valid = PROVIDERS.map((p) => p.id) as string[];
   if (Array.isArray(stored)) {
     for (const id of stored) {
-      if ((["anthropic", "openai"] as string[]).includes(id) && !seen.has(id)) {
+      if (valid.includes(id) && !seen.has(id)) {
         seen.add(id);
         order.push(id);
       }
@@ -117,5 +134,7 @@ export function aiKeyHeaders(): Record<string, string> {
   if (a) headers["x-anthropic-key"] = a;
   const o = getStoredOpenAIKey();
   if (o) headers["x-openai-key"] = o;
+  const g = getStoredGeminiKey();
+  if (g) headers["x-gemini-key"] = g;
   return headers;
 }

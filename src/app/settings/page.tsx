@@ -14,6 +14,9 @@ import {
   getStoredOpenAIKey,
   setStoredOpenAIKey,
   clearStoredOpenAIKey,
+  getStoredGeminiKey,
+  setStoredGeminiKey,
+  clearStoredGeminiKey,
   getProviderOrder,
   setProviderOrder,
 } from "@/lib/ai-config";
@@ -237,6 +240,16 @@ export default function SettingsPage() {
           read={getStoredOpenAIKey}
           write={setStoredOpenAIKey}
           clear={clearStoredOpenAIKey}
+          onChanged={bump}
+        />
+        <KeyField
+          emoji="🔷"
+          title="Google (Gemini) 키"
+          usedFor="AI 신앙 멘토 · 설교 준비 자동화. aistudio.google.com 에서 발급."
+          link="/mentor"
+          read={getStoredGeminiKey}
+          write={setStoredGeminiKey}
+          clear={clearStoredGeminiKey}
           onChanged={bump}
         />
         <ProviderOrderCard refreshKey={keyRev} />

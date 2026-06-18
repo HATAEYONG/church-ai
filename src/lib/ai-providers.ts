@@ -7,12 +7,16 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 
-export type ProviderId = "anthropic" | "openai";
-export const PROVIDER_IDS: ProviderId[] = ["anthropic", "openai"];
-export const DEFAULT_ORDER: ProviderId[] = ["anthropic", "openai"];
+export type ProviderId = "anthropic" | "openai" | "gemini";
+export const PROVIDER_IDS: ProviderId[] = ["anthropic", "openai", "gemini"];
+export const DEFAULT_ORDER: ProviderId[] = ["anthropic", "openai", "gemini"];
 
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+// Gemini는 OpenAI 호환 엔드포인트를 제공 — OpenAI SDK를 baseURL만 바꿔 재사용.
+const GEMINI_BASE_URL =
+  "https://generativelanguage.googleapis.com/v1beta/openai/";
 
 export interface ChatTurn {
   role: "user" | "assistant";
@@ -49,6 +53,8 @@ export function resolveProvider(req: Request): ResolvedProvider | null {
       "",
     openai:
       req.headers.get("x-openai-key")?.trim() || process.env.OPENAI_API_KEY || "",
+    gemini:
+      req.headers.get("x-gemini-key")?.trim() || process.env.GEMINI_API_KEY || "",
   };
   for (const id of order) {
     if (keys[id]) return { id, apiKey: keys[id] };
@@ -69,9 +75,14 @@ export interface StreamChatOptions {
 export async function streamChat(
   opts: StreamChatOptions,
 ): Promise<{ refused: boolean }> {
-  return opts.provider === "openai"
-    ? streamOpenAI(opts)
-    : streamAnthropic(opts);
+  if (opts.provider === "anthropic") return streamAnthropic(opts);
+  if (opts.provider === "gemini") {
+    return streamOpenAICompatible(opts, {
+      model: GEMINI_MODEL,
+      baseURL: GEMINI_BASE_URL,
+    });
+  }
+  return streamOpenAICompatible(opts, { model: OPENAI_MODEL });
 }
 
 async function streamAnthropic({
@@ -94,16 +105,14 @@ async function streamAnthropic({
   return { refused: final.stop_reason === "refusal" };
 }
 
-async function streamOpenAI({
-  apiKey,
-  system,
-  messages,
-  maxTokens,
-  onText,
-}: StreamChatOptions) {
-  const client = new OpenAI({ apiKey });
+// OpenAI 및 OpenAI 호환 제공자(Gemini)를 위한 공통 스트리머.
+async function streamOpenAICompatible(
+  { apiKey, system, messages, maxTokens, onText }: StreamChatOptions,
+  { model, baseURL }: { model: string; baseURL?: string },
+) {
+  const client = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
   const stream = await client.chat.completions.create({
-    model: OPENAI_MODEL,
+    model,
     max_tokens: maxTokens,
     stream: true,
     messages: [
