@@ -4,11 +4,7 @@ import {
   type SermonContext,
 } from "@/lib/sermon-pipeline";
 import { sermonStageMarker } from "@/lib/sermon-stages";
-import {
-  ANTHROPIC_MODEL,
-  createAnthropic,
-  resolveAnthropicKey,
-} from "@/lib/anthropic";
+import { resolveProvider, streamChat } from "@/lib/ai-providers";
 import { clientKey, rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -39,10 +35,10 @@ export async function POST(req: Request) {
   }
 
   const encoder = new TextEncoder();
-  const apiKey = resolveAnthropicKey(req);
+  const provider = resolveProvider(req);
 
-  // 키가 없으면 목업(데모) 파이프라인 — 5단계 샘플을 순차 스트리밍
-  if (!apiKey) {
+  // 검색순서상 키가 있는 제공자가 없으면 목업(데모) 파이프라인
+  if (!provider) {
     const stream = new ReadableStream({
       async start(controller) {
         for (const stage of SERMON_STAGES) {
@@ -65,7 +61,7 @@ export async function POST(req: Request) {
     });
   }
 
-  // 실제 호출 경로 — 5회 Opus 호출이라 더 빡빡하게 제한
+  // 실제 호출 경로 — 5단계 호출이라 더 빡빡하게 제한
   const rl = rateLimit(clientKey(req, "sermon"), 6, 60_000);
   if (!rl.ok) {
     return Response.json(
@@ -73,8 +69,6 @@ export async function POST(req: Request) {
       { status: 429, headers: { "Retry-After": String(rl.retryAfter ?? 60) } },
     );
   }
-
-  const client = createAnthropic(apiKey);
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -91,27 +85,19 @@ export async function POST(req: Request) {
           controller.enqueue(encoder.encode(`\n${sermonStageMarker(stage.id)}\n`));
 
           let acc = "";
-          const claudeStream = client.messages.stream({
-            model: ANTHROPIC_MODEL,
-            max_tokens: stage.maxTokens,
-            system: [
-              {
-                type: "text",
-                text: stage.system,
-                cache_control: { type: "ephemeral" },
-              },
-            ],
-            thinking: { type: "adaptive" },
+          const { refused } = await streamChat({
+            provider: provider.id,
+            apiKey: provider.apiKey,
+            system: stage.system,
             messages: [{ role: "user", content: stage.buildUser(ctx) }],
+            maxTokens: stage.maxTokens,
+            onText: (delta) => {
+              acc += delta;
+              controller.enqueue(encoder.encode(delta));
+            },
           });
 
-          claudeStream.on("text", (delta) => {
-            acc += delta;
-            controller.enqueue(encoder.encode(delta));
-          });
-
-          const final = await claudeStream.finalMessage();
-          if (final.stop_reason === "refusal") {
+          if (refused) {
             const note =
               "\n\n(이 단계에서 함께 다루기 어려운 내용이 감지되었습니다. 목회자님과 직접 상의해 주세요.)";
             acc += note;

@@ -3,20 +3,11 @@ import {
   MENTOR_PERSONAS,
   getMockMentorReply,
 } from "@/lib/mentor-prompt";
-import {
-  ANTHROPIC_MODEL,
-  createAnthropic,
-  resolveAnthropicKey,
-} from "@/lib/anthropic";
+import { resolveProvider, streamChat, type ChatTurn } from "@/lib/ai-providers";
 import { clientKey, rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -41,7 +32,7 @@ function streamMock(text: string): Response {
 }
 
 export async function POST(req: Request) {
-  let body: { messages?: ChatMessage[]; personaId?: string };
+  let body: { messages?: ChatTurn[]; personaId?: string };
   try {
     body = await req.json();
   } catch {
@@ -49,7 +40,7 @@ export async function POST(req: Request) {
   }
 
   const messages = (body.messages ?? []).filter(
-    (m): m is ChatMessage =>
+    (m): m is ChatTurn =>
       (m?.role === "user" || m?.role === "assistant") &&
       typeof m?.content === "string" &&
       m.content.trim().length > 0,
@@ -74,10 +65,10 @@ export async function POST(req: Request) {
   }
 
   const personaId = body.personaId ?? "default";
-  const apiKey = resolveAnthropicKey(req);
+  const provider = resolveProvider(req);
 
-  // 키가 없으면 목업(데모) 응답으로 동작
-  if (!apiKey) {
+  // 검색순서상 키가 있는 제공자가 없으면 목업(데모) 응답
+  if (!provider) {
     return streamMock(getMockMentorReply(personaId));
   }
 
@@ -95,29 +86,19 @@ export async function POST(req: Request) {
     ? `${MENTOR_SYSTEM_PROMPT}\n\n## 이번 대화의 멘토\n${persona.prompt}`
     : MENTOR_SYSTEM_PROMPT;
 
-  const client = createAnthropic(apiKey);
   const encoder = new TextEncoder();
-
-  // 스트리밍으로 응답을 전달해 긴 응답에서도 타임아웃 없이 동작하게 합니다.
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const claudeStream = client.messages.stream({
-          model: ANTHROPIC_MODEL,
-          max_tokens: 2048,
-          system: [
-            { type: "text", text: system, cache_control: { type: "ephemeral" } },
-          ],
-          thinking: { type: "adaptive" },
-          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        const { refused } = await streamChat({
+          provider: provider.id,
+          apiKey: provider.apiKey,
+          system,
+          messages,
+          maxTokens: 2048,
+          onText: (delta) => controller.enqueue(encoder.encode(delta)),
         });
-
-        claudeStream.on("text", (delta) => {
-          controller.enqueue(encoder.encode(delta));
-        });
-
-        const final = await claudeStream.finalMessage();
-        if (final.stop_reason === "refusal") {
+        if (refused) {
           controller.enqueue(
             encoder.encode(
               "\n\n(이 주제는 제가 함께 다루기 어려운 부분이에요. 믿을 수 있는 어른이나 목회자 선생님과 꼭 나눠 보세요.)",

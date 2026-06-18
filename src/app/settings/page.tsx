@@ -4,9 +4,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, PageHeader } from "@/components/ui";
 import {
+  PROVIDERS,
+  DEFAULT_ORDER,
+  type ProviderId,
+  getStoredKey,
   getStoredAnthropicKey,
   setStoredAnthropicKey,
   clearStoredAnthropicKey,
+  getStoredOpenAIKey,
+  setStoredOpenAIKey,
+  clearStoredOpenAIKey,
+  getProviderOrder,
+  setProviderOrder,
 } from "@/lib/ai-config";
 import {
   getStoredElevenLabsKey,
@@ -18,10 +27,11 @@ interface KeyFieldProps {
   title: string;
   emoji: string;
   usedFor: string;
-  link: string;
+  link?: string;
   read: () => string;
   write: (v: string) => void;
   clear: () => void;
+  onChanged?: () => void;
 }
 
 function KeyField({
@@ -32,6 +42,7 @@ function KeyField({
   read,
   write,
   clear,
+  onChanged,
 }: KeyFieldProps) {
   const [value, setValue] = useState("");
   const [connected, setConnected] = useState(false);
@@ -50,12 +61,14 @@ function KeyField({
     setConnected(value.trim().length > 0);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+    onChanged?.();
   };
 
   const remove = () => {
     clear();
     setValue("");
     setConnected(false);
+    onChanged?.();
   };
 
   return (
@@ -99,18 +112,104 @@ function KeyField({
         </button>
       </div>
       {saved && <p className="mt-2 text-sm text-emerald-600">저장되었습니다!</p>}
-      <p className="mt-2 text-xs text-ink/40">
-        키는 이 브라우저에만 저장됩니다. {link && (
+      {link && (
+        <p className="mt-2 text-xs text-ink/40">
+          키는 이 브라우저에만 저장됩니다.{" "}
           <Link href={link} className="text-amen-600 underline">
             관련 설정 →
           </Link>
-        )}
+        </p>
+      )}
+    </Card>
+  );
+}
+
+function ProviderOrderCard({ refreshKey }: { refreshKey: number }) {
+  const [order, setOrder] = useState<ProviderId[]>(DEFAULT_ORDER);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setOrder(getProviderOrder());
+    setMounted(true);
+  }, [refreshKey]);
+
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= order.length) return;
+    const next = [...order];
+    [next[i], next[j]] = [next[j], next[i]];
+    setOrder(next);
+    setProviderOrder(next);
+  };
+
+  return (
+    <Card>
+      <h2 className="flex items-center gap-2 font-bold">
+        <span aria-hidden>🔀</span>
+        검색순서 (제공자 우선순위)
+      </h2>
+      <p className="mt-1 text-xs text-ink/50">
+        위에서부터 순서대로, <b>키가 연결된 첫 제공자</b>를 사용합니다. 키가 하나도
+        없으면 목업으로 동작합니다.
       </p>
+
+      <div className="mt-3 space-y-2">
+        {order.map((id, i) => {
+          const meta = PROVIDERS.find((p) => p.id === id);
+          if (!meta) return null;
+          const connected = mounted && getStoredKey(id).length > 0;
+          return (
+            <div
+              key={id}
+              className="flex items-center gap-2 rounded-xl border border-black/10 bg-white px-3 py-2.5"
+            >
+              <span className="shrink-0 rounded-full bg-amen-600 px-2 py-0.5 text-xs font-bold text-white">
+                {i + 1}순위
+              </span>
+              <span className="flex min-w-0 items-center gap-1 truncate text-sm font-medium">
+                <span aria-hidden>{meta.emoji}</span>
+                <span className="truncate">{meta.label}</span>
+              </span>
+              <span
+                className={`ml-1 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                  connected
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-black/5 text-ink/45"
+                }`}
+              >
+                {connected ? "✅ 연결" : "🧪 목업"}
+              </span>
+              <div className="ml-auto flex shrink-0 gap-1">
+                <button
+                  onClick={() => move(i, -1)}
+                  disabled={i === 0}
+                  aria-label="위로"
+                  className="grid h-7 w-7 place-items-center rounded-lg border border-black/10 text-ink/60 transition hover:bg-black/5 disabled:opacity-30"
+                >
+                  ↑
+                </button>
+                <button
+                  onClick={() => move(i, 1)}
+                  disabled={i === order.length - 1}
+                  aria-label="아래로"
+                  className="grid h-7 w-7 place-items-center rounded-lg border border-black/10 text-ink/60 transition hover:bg-black/5 disabled:opacity-30"
+                >
+                  ↓
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </Card>
   );
 }
 
 export default function SettingsPage() {
+  // 키 변경 시 검색순서 카드의 연결 상태를 갱신하기 위한 신호
+  const [keyRev, setKeyRev] = useState(0);
+  const bump = () => setKeyRev((n) => n + 1);
+
   return (
     <div className="animate-fade-up">
       <PageHeader
@@ -123,16 +222,28 @@ export default function SettingsPage() {
         <KeyField
           emoji="🕊️"
           title="Anthropic (Claude) 키"
-          usedFor="AI 신앙 멘토 · 설교 준비 자동화에 사용됩니다. console.anthropic.com 에서 발급."
+          usedFor="AI 신앙 멘토 · 설교 준비 자동화. console.anthropic.com 에서 발급."
           link="/mentor"
           read={getStoredAnthropicKey}
           write={setStoredAnthropicKey}
           clear={clearStoredAnthropicKey}
+          onChanged={bump}
         />
+        <KeyField
+          emoji="🤖"
+          title="OpenAI (GPT) 키"
+          usedFor="AI 신앙 멘토 · 설교 준비 자동화. platform.openai.com 에서 발급."
+          link="/mentor"
+          read={getStoredOpenAIKey}
+          write={setStoredOpenAIKey}
+          clear={clearStoredOpenAIKey}
+          onChanged={bump}
+        />
+        <ProviderOrderCard refreshKey={keyRev} />
         <KeyField
           emoji="🎙️"
           title="ElevenLabs 키"
-          usedFor="음성 듣기 · 보이스 클로닝에 사용됩니다. elevenlabs.io 에서 발급."
+          usedFor="음성 듣기 · 보이스 클로닝. elevenlabs.io 에서 발급."
           link="/voice-settings"
           read={getStoredElevenLabsKey}
           write={setStoredElevenLabsKey}
